@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Set
@@ -17,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ServerConfig:
-    host: str = 'localhost'
-    port: int = 5001
+    host: str = os.getenv('HOST', '0.0.0.0')  # Changed from localhost to 0.0.0.0 for production
+    port: int = int(os.getenv('PORT', '5001'))
     max_attempts: int = 20
     cleanup_interval: int = 15
     connection_timeout: int = 15
