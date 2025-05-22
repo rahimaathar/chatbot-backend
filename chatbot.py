@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import fnmatch
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Set
@@ -8,6 +9,12 @@ import websockets
 from websockets.server import WebSocketServer, serve
 from websockets.exceptions import ConnectionClosedError, InvalidMessage
 import os
+
+def is_origin_allowed(origin: str, allowed_patterns: Set[str]) -> bool:
+    """Check if the origin matches any allowed origin patterns using wildcard support."""
+    if not origin:
+        return False
+    return any(fnmatch.fnmatch(origin, pattern) for pattern in allowed_patterns)
 
 # Configure logging
 logging.basicConfig(
@@ -65,11 +72,12 @@ class ChatServer:
     async def process_request(self, path, request_headers):
         """Handle incoming connections with rate limiting and CORS."""
         try:
-            logger.info(f"Processing request from {request_headers.get('Origin', 'unknown')}")
+            origin = request_headers.get('Origin', '')
+            logger.info(f"Processing WebSocket request from origin: {origin}")
+            logger.info(f"Request headers: {dict(request_headers)}")
             
             # Handle CORS preflight
-            origin = request_headers.get('Origin', '')
-            if '*' not in self.config.allowed_origins and origin not in self.config.allowed_origins:
+            if '*' not in self.config.allowed_origins and not is_origin_allowed(origin, self.config.allowed_origins):
                 logger.warning(f"Blocked connection from disallowed origin: {origin}")
                 return 403, [], b"Origin not allowed"
 
@@ -122,9 +130,10 @@ class ChatServer:
         """Manage client connection lifecycle."""
         # Verify origin before proceeding
         origin = websocket.request_headers.get('Origin', '')
-        logger.info(f"New WebSocket connection from {origin}")
+        logger.info(f"New WebSocket connection attempt from origin: {origin}")
+        logger.info(f"Request headers: {dict(websocket.request_headers)}")
         
-        if '*' not in self.config.allowed_origins and origin not in self.config.allowed_origins:
+        if '*' not in self.config.allowed_origins and not is_origin_allowed(origin, self.config.allowed_origins):
             logger.warning(f"Blocked connection from disallowed origin: {origin}")
             await websocket.close(1008, "Origin not allowed")
             return
