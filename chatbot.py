@@ -84,14 +84,6 @@ class ChatServer:
                 protocols = [p.strip() for p in protocols]
                 logger.info(f"Requested protocols: {protocols}")
                 
-                if not protocols:
-                    logger.error("No protocols specified")
-                    return 400, headers, b"No protocols specified"
-                
-                if 'chat' not in protocols:
-                    logger.error(f"Missing chat subprotocol. Available protocols: {protocols}")
-                    return 400, headers, b"Missing chat subprotocol"
-
                 # Build WebSocket response headers
                 ws_key = request_headers.get('Sec-WebSocket-Key', '')
                 ws_accept = websockets.handshake.build_response(ws_key)
@@ -100,8 +92,11 @@ class ChatServer:
                     'Upgrade': 'websocket',
                     'Connection': 'Upgrade',
                     'Sec-WebSocket-Accept': ws_accept,
-                    'Sec-WebSocket-Protocol': 'chat'
                 })
+
+                # Add protocol if requested
+                if protocols:
+                    headers['Sec-WebSocket-Protocol'] = 'chat'
 
                 logger.info("Sending WebSocket upgrade response")
                 return 101, headers, b"Switching Protocols"
