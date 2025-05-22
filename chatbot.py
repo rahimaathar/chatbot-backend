@@ -69,6 +69,11 @@ class ChatServer:
                 logger.warning(f"Blocked connection from disallowed origin: {origin}")
                 return 403, [], b"Origin not allowed"
 
+            # Handle WebSocket upgrade request
+            if request_headers.get('Upgrade', '').lower() != 'websocket':
+                logger.warning("Non-WebSocket connection attempt")
+                return 426, [], b"Upgrade Required"
+
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
             
             # Check if IP is banned
@@ -296,7 +301,8 @@ class ChatServer:
             ping_interval=self.config.ping_interval,
             ping_timeout=self.config.ping_timeout,
             max_size=self.config.max_message_size,
-            process_request=self.process_request
+            process_request=self.process_request,
+            origins=self.config.allowed_origins
         ):
             logger.info(f"Server running on ws://{self.config.host}:{self.config.port}")
             await asyncio.Future()  # Run forever
