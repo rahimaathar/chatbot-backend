@@ -33,7 +33,9 @@ class ServerConfig:
             # Allow all origins in development, restrict in production
             self.allowed_origins = {'*'} if os.environ.get('ENVIRONMENT') != 'production' else {
                 'https://chatbot-frontend-xprn-gr7ntgggc-rrs-projects-de5f63ae.vercel.app',
-                'http://localhost:3000'
+                'https://chatbot-frontend.vercel.app',  # Default Vercel alias
+                'https://*.vercel.app',  # Allow all Vercel preview deployments
+                'http://localhost:3000'  # Local development
             }
 
 class ChatServer:
@@ -64,6 +66,7 @@ class ChatServer:
                 origin = request_headers.get('Origin', '')
                 if '*' in self.config.allowed_origins or origin in self.config.allowed_origins:
                     return None
+                logger.warning(f"Blocked connection from disallowed origin: {origin}")
                 return 403, [], b"Origin not allowed"
 
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
@@ -100,6 +103,13 @@ class ChatServer:
 
     async def handle_client(self, websocket: WebSocketServer):
         """Manage client connection lifecycle."""
+        # Verify origin before proceeding
+        origin = websocket.request_headers.get('Origin', '')
+        if '*' not in self.config.allowed_origins and origin not in self.config.allowed_origins:
+            logger.warning(f"Blocked connection from disallowed origin: {origin}")
+            await websocket.close(1008, "Origin not allowed")
+            return
+
         if websocket in self.clients:
             logger.warning("Duplicate connection from existing socket")
             return
