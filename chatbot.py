@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ServerConfig:
     host: str = os.getenv('HOST', '0.0.0.0')  # Changed from localhost to 0.0.0.0 for production
-    port: int = int(os.getenv('PORT', '5001'))
+    port: int = int(os.getenv('PORT', '10000'))  # Updated default port to match Render
     max_attempts: int = 20
     cleanup_interval: int = 15
     connection_timeout: int = 15
