@@ -68,10 +68,8 @@ class ChatServer:
             logger.info(f"Processing request from {request_headers.get('Origin', 'unknown')}")
             
             # Handle CORS preflight
-            if request_headers.get('Sec-WebSocket-Protocol'):
-                origin = request_headers.get('Origin', '')
-                if '*' in self.config.allowed_origins or origin in self.config.allowed_origins:
-                    return None
+            origin = request_headers.get('Origin', '')
+            if '*' not in self.config.allowed_origins and origin not in self.config.allowed_origins:
                 logger.warning(f"Blocked connection from disallowed origin: {origin}")
                 return 403, [], b"Origin not allowed"
 
@@ -79,6 +77,12 @@ class ChatServer:
             if request_headers.get('Upgrade', '').lower() != 'websocket':
                 logger.warning("Non-WebSocket connection attempt")
                 return 426, [], b"Upgrade Required"
+
+            # Handle protocol negotiation
+            protocols = request_headers.get('Sec-WebSocket-Protocol', '').split(',')
+            if 'chat' not in protocols:
+                logger.warning("Missing required 'chat' protocol")
+                return 400, [], b"Missing required protocol"
 
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
             logger.info(f"Connection attempt from {client_ip}")
@@ -314,7 +318,8 @@ class ChatServer:
             max_size=self.config.max_message_size,
             process_request=self.process_request,
             origins=self.config.allowed_origins,
-            subprotocols=['chat']
+            subprotocols=['chat'],
+            path='/ws'
         ):
             logger.info(f"Server running on ws://{self.config.host}:{self.config.port}/ws")
             await asyncio.Future()  # Run forever
