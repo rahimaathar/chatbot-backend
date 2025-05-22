@@ -32,9 +32,14 @@ class ServerConfig:
         if self.allowed_origins is None:
             # Allow all origins in development, restrict in production
             self.allowed_origins = {'*'} if os.environ.get('ENVIRONMENT') != 'production' else {
-                'https://chatbot-frontend-xqiy-1roh5fo8f-rrs-projects-de5f63ae.vercel.app/',
-                'https://chatbot-frontend-l9qs.vercel.app/'
-                'http://localhost:3000'  # Local development
+                'https://chatbot-frontend-l9qs.vercel.app',  # New Vercel deployment
+                'https://chatbot-frontend-xprn-gr7ntgggc-rrs-projects-de5f63ae.vercel.app',
+                'https://chatbot-frontend.vercel.app',  # Default Vercel alias
+                'https://*.vercel.app',  # Allow all Vercel preview deployments
+                'http://localhost:3000',  # Local development
+                'http://localhost:5173',  # Vite development server
+                'http://127.0.0.1:3000',
+                'http://127.0.0.1:5173'
             }
 
 class ChatServer:
@@ -308,9 +313,10 @@ class ChatServer:
             ping_timeout=self.config.ping_timeout,
             max_size=self.config.max_message_size,
             process_request=self.process_request,
-            origins=self.config.allowed_origins
+            origins=self.config.allowed_origins,
+            subprotocols=['chat']
         ):
-            logger.info(f"Server running on ws://{self.config.host}:{self.config.port}")
+            logger.info(f"Server running on ws://{self.config.host}:{self.config.port}/ws")
             await asyncio.Future()  # Run forever
 
 if __name__ == "__main__":
