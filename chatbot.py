@@ -48,8 +48,25 @@ class ChatServer:
                 del self.connection_attempts[ip]
 
     async def process_request(self, path, request_headers):
-        """Handle incoming connections with rate limiting."""
+        """Handle incoming connections with rate limiting and CORS."""
         try:
+            # Handle CORS preflight requests
+            headers = {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Max-Age': '86400',
+            }
+
+            # Handle WebSocket upgrade request
+            if request_headers.get('Upgrade', '').lower() == 'websocket':
+                headers.update({
+                    'Upgrade': 'websocket',
+                    'Connection': 'Upgrade',
+                })
+                # Return 101 Switching Protocols for WebSocket upgrade
+                return 101, headers, b"Switching Protocols"
+
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
             
             # Check if IP is banned
@@ -59,7 +76,7 @@ class ChatServer:
                 if (datetime.now() - ban_time).total_seconds() > 60:
                     del self.ban_list[client_ip]
                 else:
-                    return 403, [], b"IP banned"
+                    return 403, headers, b"IP banned"
 
             await self.cleanup_old_attempts()
             
@@ -74,7 +91,7 @@ class ChatServer:
             if len(recent_attempts) >= self.config.max_attempts:
                 self.ban_list[client_ip] = datetime.now()
                 logger.warning(f"Banned {client_ip} for excessive attempts")
-                return 429, [], b"Too many connection attempts"
+                return 429, headers, b"Too many connection attempts"
             
             self.connection_attempts[client_ip].append(datetime.now())
             return None
