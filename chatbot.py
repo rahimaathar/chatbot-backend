@@ -26,6 +26,15 @@ class ServerConfig:
     max_message_size: int = 2**20  # 1MB
     ping_interval: int = 20
     ping_timeout: int = 10
+    allowed_origins: Set[str] = None
+
+    def __post_init__(self):
+        if self.allowed_origins is None:
+            # Allow all origins in development, restrict in production
+            self.allowed_origins = {'*'} if os.environ.get('ENVIRONMENT') != 'production' else {
+                'https://chatbot-frontend-xprn-gr7ntgggc-rrs-projects-de5f63ae.vercel.app',
+                'http://localhost:3000'
+            }
 
 class ChatServer:
     def __init__(self, config: Optional[ServerConfig] = None):
@@ -48,8 +57,15 @@ class ChatServer:
                 del self.connection_attempts[ip]
 
     async def process_request(self, path, request_headers):
-        """Handle incoming connections with rate limiting."""
+        """Handle incoming connections with rate limiting and CORS."""
         try:
+            # Handle CORS preflight
+            if request_headers.get('Sec-WebSocket-Protocol'):
+                origin = request_headers.get('Origin', '')
+                if '*' in self.config.allowed_origins or origin in self.config.allowed_origins:
+                    return None
+                return 403, [], b"Origin not allowed"
+
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
             
             # Check if IP is banned
