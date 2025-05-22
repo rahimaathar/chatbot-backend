@@ -1,13 +1,13 @@
 import asyncio
 import json
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Set
 import websockets
 from websockets.server import WebSocketServer, serve
 from websockets.exceptions import ConnectionClosedError, InvalidMessage
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ServerConfig:
-    host: str = os.getenv('HOST', '0.0.0.0')  # Changed from localhost to 0.0.0.0 for production
-    port: int = int(os.getenv('PORT', '10000'))  # Updated default port to match Render
+    host: str = '0.0.0.0'
+    port: int = int(os.environ.get("PORT", 10000))
     max_attempts: int = 20
     cleanup_interval: int = 15
     connection_timeout: int = 15
@@ -48,60 +48,8 @@ class ChatServer:
                 del self.connection_attempts[ip]
 
     async def process_request(self, path, request_headers):
-        """Handle incoming connections with rate limiting and CORS."""
+        """Handle incoming connections with rate limiting."""
         try:
-            logger.info(f"Received request for path: {path}")
-            logger.info(f"Request headers: {request_headers}")
-
-            # Handle CORS preflight requests
-            headers = {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Protocol',
-                'Access-Control-Max-Age': '86400',
-            }
-
-            # Handle WebSocket upgrade request
-            if request_headers.get('Upgrade', '').lower() == 'websocket':
-                logger.info("WebSocket upgrade request detected")
-                
-                # Check for required WebSocket headers
-                if not request_headers.get('Sec-WebSocket-Key'):
-                    logger.error("Missing Sec-WebSocket-Key header")
-                    return 400, headers, b"Missing Sec-WebSocket-Key header"
-
-                if not request_headers.get('Sec-WebSocket-Version'):
-                    logger.error("Missing Sec-WebSocket-Version header")
-                    return 400, headers, b"Missing Sec-WebSocket-Version header"
-
-                # Check path
-                if path != '/ws':
-                    logger.error(f"Invalid WebSocket path: {path}")
-                    return 404, headers, b"Not Found"
-
-                # Check for chat subprotocol
-                protocols = request_headers.get('Sec-WebSocket-Protocol', '').split(',')
-                protocols = [p.strip() for p in protocols]
-                logger.info(f"Requested protocols: {protocols}")
-                
-                # Build WebSocket response headers
-                ws_key = request_headers.get('Sec-WebSocket-Key', '')
-                ws_accept = websockets.handshake.build_response(ws_key)
-                
-                headers.update({
-                    'Upgrade': 'websocket',
-                    'Connection': 'Upgrade',
-                    'Sec-WebSocket-Accept': ws_accept,
-                })
-
-                # Add protocol if requested
-                if protocols:
-                    headers['Sec-WebSocket-Protocol'] = 'chat'
-
-                logger.info("Sending WebSocket upgrade response")
-                return 101, headers, b"Switching Protocols"
-
-            # Handle regular HTTP requests
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
             
             # Check if IP is banned
@@ -111,7 +59,7 @@ class ChatServer:
                 if (datetime.now() - ban_time).total_seconds() > 60:
                     del self.ban_list[client_ip]
                 else:
-                    return 403, headers, b"IP banned"
+                    return 403, [], b"IP banned"
 
             await self.cleanup_old_attempts()
             
@@ -126,7 +74,7 @@ class ChatServer:
             if len(recent_attempts) >= self.config.max_attempts:
                 self.ban_list[client_ip] = datetime.now()
                 logger.warning(f"Banned {client_ip} for excessive attempts")
-                return 429, headers, b"Too many connection attempts"
+                return 429, [], b"Too many connection attempts"
             
             self.connection_attempts[client_ip].append(datetime.now())
             return None
@@ -322,10 +270,7 @@ class ChatServer:
             ping_interval=self.config.ping_interval,
             ping_timeout=self.config.ping_timeout,
             max_size=self.config.max_message_size,
-            process_request=self.process_request,
-            origins=['*'],  # Allow all origins
-            subprotocols=['chat'],  # Add subprotocol
-            compression=None  # Disable compression for better compatibility
+            process_request=self.process_request
         ):
             logger.info(f"Server running on ws://{self.config.host}:{self.config.port}")
             await asyncio.Future()  # Run forever
