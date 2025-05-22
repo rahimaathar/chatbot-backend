@@ -54,18 +54,22 @@ class ChatServer:
             headers = {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Upgrade, Connection',
+                'Access-Control-Allow-Headers': 'Content-Type, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Protocol',
                 'Access-Control-Max-Age': '86400',
             }
 
             # Handle WebSocket upgrade request
             if request_headers.get('Upgrade', '').lower() == 'websocket':
+                if path != '/ws':
+                    return 404, headers, b"Not Found"
+
                 headers.update({
                     'Upgrade': 'websocket',
                     'Connection': 'Upgrade',
                     'Sec-WebSocket-Accept': websockets.handshake.build_response(
                         request_headers.get('Sec-WebSocket-Key', '')
-                    )
+                    ),
+                    'Sec-WebSocket-Protocol': 'chat'
                 })
                 return 101, headers, b"Switching Protocols"
 
@@ -292,9 +296,10 @@ class ChatServer:
             process_request=self.process_request,
             origins=['*'],  # Allow all origins
             subprotocols=['chat'],  # Add subprotocol
-            compression=None  # Disable compression for better compatibility
+            compression=None,  # Disable compression for better compatibility
+            path='/ws'  # Add explicit path
         ):
-            logger.info(f"Server running on ws://{self.config.host}:{self.config.port}")
+            logger.info(f"Server running on ws://{self.config.host}:{self.config.port}/ws")
             await asyncio.Future()  # Run forever
 
 if __name__ == "__main__":
