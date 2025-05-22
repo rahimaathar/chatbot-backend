@@ -61,6 +61,8 @@ class ChatServer:
     async def process_request(self, path, request_headers):
         """Handle incoming connections with rate limiting and CORS."""
         try:
+            logger.info(f"Processing request from {request_headers.get('Origin', 'unknown')}")
+            
             # Handle CORS preflight
             if request_headers.get('Sec-WebSocket-Protocol'):
                 origin = request_headers.get('Origin', '')
@@ -75,6 +77,7 @@ class ChatServer:
                 return 426, [], b"Upgrade Required"
 
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
+            logger.info(f"Connection attempt from {client_ip}")
             
             # Check if IP is banned
             if client_ip in self.ban_list:
@@ -83,6 +86,7 @@ class ChatServer:
                 if (datetime.now() - ban_time).total_seconds() > 60:
                     del self.ban_list[client_ip]
                 else:
+                    logger.warning(f"Blocked banned IP: {client_ip}")
                     return 403, [], b"IP banned"
 
             await self.cleanup_old_attempts()
@@ -110,6 +114,8 @@ class ChatServer:
         """Manage client connection lifecycle."""
         # Verify origin before proceeding
         origin = websocket.request_headers.get('Origin', '')
+        logger.info(f"New WebSocket connection from {origin}")
+        
         if '*' not in self.config.allowed_origins and origin not in self.config.allowed_origins:
             logger.warning(f"Blocked connection from disallowed origin: {origin}")
             await websocket.close(1008, "Origin not allowed")
@@ -127,6 +133,7 @@ class ChatServer:
                 timeout=self.config.connection_timeout
             )
             data = json.loads(message)
+            logger.info(f"Received initial message: {data}")
             
             if data.get("type") != "connect":
                 raise ValueError("First message must be 'connect'")
