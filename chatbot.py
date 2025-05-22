@@ -296,10 +296,9 @@ class ChatServer:
             process_request=self.process_request,
             origins=['*'],  # Allow all origins
             subprotocols=['chat'],  # Add subprotocol
-            compression=None,  # Disable compression for better compatibility
-            path='/ws'  # Add explicit path
+            compression=None  # Disable compression for better compatibility
         ):
-            logger.info(f"Server running on ws://{self.config.host}:{self.config.port}/ws")
+            logger.info(f"Server running on ws://{self.config.host}:{self.config.port}")
             await asyncio.Future()  # Run forever
 
 if __name__ == "__main__":
