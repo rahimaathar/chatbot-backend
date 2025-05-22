@@ -50,6 +50,9 @@ class ChatServer:
     async def process_request(self, path, request_headers):
         """Handle incoming connections with rate limiting and CORS."""
         try:
+            logger.info(f"Received request for path: {path}")
+            logger.info(f"Request headers: {request_headers}")
+
             # Handle CORS preflight requests
             headers = {
                 'Access-Control-Allow-Origin': '*',
@@ -60,19 +63,43 @@ class ChatServer:
 
             # Handle WebSocket upgrade request
             if request_headers.get('Upgrade', '').lower() == 'websocket':
+                logger.info("WebSocket upgrade request detected")
+                
+                # Check for required WebSocket headers
+                if not request_headers.get('Sec-WebSocket-Key'):
+                    logger.error("Missing Sec-WebSocket-Key header")
+                    return 400, headers, b"Missing Sec-WebSocket-Key header"
+
+                if not request_headers.get('Sec-WebSocket-Version'):
+                    logger.error("Missing Sec-WebSocket-Version header")
+                    return 400, headers, b"Missing Sec-WebSocket-Version header"
+
+                # Check path
                 if path != '/ws':
+                    logger.error(f"Invalid WebSocket path: {path}")
                     return 404, headers, b"Not Found"
 
+                # Check for chat subprotocol
+                protocols = request_headers.get('Sec-WebSocket-Protocol', '').split(',')
+                if 'chat' not in [p.strip() for p in protocols]:
+                    logger.error("Missing chat subprotocol")
+                    return 400, headers, b"Missing chat subprotocol"
+
+                # Build WebSocket response headers
+                ws_key = request_headers.get('Sec-WebSocket-Key', '')
+                ws_accept = websockets.handshake.build_response(ws_key)
+                
                 headers.update({
                     'Upgrade': 'websocket',
                     'Connection': 'Upgrade',
-                    'Sec-WebSocket-Accept': websockets.handshake.build_response(
-                        request_headers.get('Sec-WebSocket-Key', '')
-                    ),
+                    'Sec-WebSocket-Accept': ws_accept,
                     'Sec-WebSocket-Protocol': 'chat'
                 })
+
+                logger.info("Sending WebSocket upgrade response")
                 return 101, headers, b"Switching Protocols"
 
+            # Handle regular HTTP requests
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
             
             # Check if IP is banned
