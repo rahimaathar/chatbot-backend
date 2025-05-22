@@ -128,6 +128,11 @@ class ChatServer:
 
     async def handle_client(self, websocket: WebSocketServer):
         """Manage client connection lifecycle."""
+        if websocket.path != "/ws":
+            logger.warning(f"Rejected connection to invalid path: {websocket.path}")
+            await websocket.close(1008, "Invalid WebSocket path")
+            return
+
         # Verify origin before proceeding
         origin = websocket.request_headers.get('Origin', '')
         logger.info(f"New WebSocket connection attempt from origin: {origin}")
@@ -327,8 +332,7 @@ class ChatServer:
             max_size=self.config.max_message_size,
             process_request=self.process_request,
             origins=self.config.allowed_origins,
-            subprotocols=['chat'],
-            path='/ws'
+            subprotocols=['chat']
         ):
             logger.info(f"Server running on ws://{self.config.host}:{self.config.port}/ws")
             await asyncio.Future()  # Run forever
