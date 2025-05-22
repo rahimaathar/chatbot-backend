@@ -81,8 +81,15 @@ class ChatServer:
 
                 # Check for chat subprotocol
                 protocols = request_headers.get('Sec-WebSocket-Protocol', '').split(',')
-                if 'chat' not in [p.strip() for p in protocols]:
-                    logger.error("Missing chat subprotocol")
+                protocols = [p.strip() for p in protocols]
+                logger.info(f"Requested protocols: {protocols}")
+                
+                if not protocols:
+                    logger.error("No protocols specified")
+                    return 400, headers, b"No protocols specified"
+                
+                if 'chat' not in protocols:
+                    logger.error(f"Missing chat subprotocol. Available protocols: {protocols}")
                     return 400, headers, b"Missing chat subprotocol"
 
                 # Build WebSocket response headers
