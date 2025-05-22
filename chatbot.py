@@ -32,9 +32,8 @@ class ServerConfig:
         if self.allowed_origins is None:
             # Allow all origins in development, restrict in production
             self.allowed_origins = {'*'} if os.environ.get('ENVIRONMENT') != 'production' else {
-                'https://chatbot-frontend-xprn-gr7ntgggc-rrs-projects-de5f63ae.vercel.app',
-                'https://chatbot-frontend.vercel.app',  # Default Vercel alias
-                'https://*.vercel.app',  # Allow all Vercel preview deployments
+                'https://chatbot-frontend-xqiy-1roh5fo8f-rrs-projects-de5f63ae.vercel.app/',
+                'https://chatbot-frontend-l9qs.vercel.app/'
                 'http://localhost:3000'  # Local development
             }
 
