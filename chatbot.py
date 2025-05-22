@@ -54,7 +54,7 @@ class ChatServer:
             headers = {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Headers': 'Content-Type, Upgrade, Connection',
                 'Access-Control-Max-Age': '86400',
             }
 
@@ -63,8 +63,10 @@ class ChatServer:
                 headers.update({
                     'Upgrade': 'websocket',
                     'Connection': 'Upgrade',
+                    'Sec-WebSocket-Accept': websockets.handshake.build_response(
+                        request_headers.get('Sec-WebSocket-Key', '')
+                    )
                 })
-                # Return 101 Switching Protocols for WebSocket upgrade
                 return 101, headers, b"Switching Protocols"
 
             client_ip = request_headers.get('X-Forwarded-For', 'unknown')
@@ -287,7 +289,10 @@ class ChatServer:
             ping_interval=self.config.ping_interval,
             ping_timeout=self.config.ping_timeout,
             max_size=self.config.max_message_size,
-            process_request=self.process_request
+            process_request=self.process_request,
+            origins=['*'],  # Allow all origins
+            subprotocols=['chat'],  # Add subprotocol
+            compression=None  # Disable compression for better compatibility
         ):
             logger.info(f"Server running on ws://{self.config.host}:{self.config.port}")
             await asyncio.Future()  # Run forever
